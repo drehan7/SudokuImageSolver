@@ -1,0 +1,6 @@
+objs/
+venv
+obj
+**/venv
+*.log
+

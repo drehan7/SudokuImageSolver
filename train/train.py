@@ -26,12 +26,11 @@ def find_board(imagepath):
     return roi
 
 
-#img = cv2.imread("sudoku6.jpeg", 0)
-
 images = []
-for im in os.listdir():
+imgDir = "../assets"
+for im in os.listdir("../assets"):
     if "sudoku" in im:
-        images.append(im)
+        images.append(os.path.join(imgDir, im))
 
 
 cropped_imgs = []

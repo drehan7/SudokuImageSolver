@@ -1,22 +1,4 @@
-#include <opencv4/opencv2/core.hpp>
-#include <opencv4/opencv2/highgui.hpp>
-#include <opencv4/opencv2/imgproc.hpp>
-#include <opencv4/opencv2/ml.hpp>
-
-//#define DEBUG_VIZ 
-
-#include <iostream>
-#include <vector>
-
-/* constexpr int MIN_CONTOUR_AREA = 50; */
-constexpr int MIN_CONTOUR_AREA = 300;
-
-constexpr int RESIZED_IMAGE_WIDTH = 20;
-constexpr int RESIZED_IMAGE_HEIGHT = 30;
-
-cv::Mat findBoard( std::string fp );
-int train(std::vector<cv::String>& filenames);
-std::vector<cv::Point> getMaxContour( std::vector<std::vector<cv::Point>>& contours );
+#include "test.h"
 
 std::vector<cv::Point> getMaxContour( std::vector<std::vector<cv::Point>>& contours )
 {
@@ -33,7 +15,7 @@ std::vector<cv::Point> getMaxContour( std::vector<std::vector<cv::Point>>& conto
     return ret;
 }
 
-cv::Mat findBoard( std::string fp )
+cv::Mat findBoard( const std::string& fp )
 {
     cv::Mat gauss;
     cv::Mat edges;
@@ -157,7 +139,7 @@ int train(std::vector<cv::String>& filenames)
 
 
     for ( int i = 0; i < pContours.size(); ++i ) {
-        if ( cv::contourArea(pContours.at(i)) > MIN_CONTOUR_AREA )
+        /* if ( cv::contourArea(pContours.at(i)) > MIN_CONTOUR_AREA ) */
         {
             cv::Rect boundingRect = cv::boundingRect(pContours.at(i));
 

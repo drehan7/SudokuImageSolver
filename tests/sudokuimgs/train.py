@@ -8,27 +8,6 @@ def showimg(img, name="IMG"):
     cv2.imshow(name, img)
     cv2.waitKey(0)
 
-
-#def find_board(imagepath):
-#    img = cv2.imread(imagepath, 0)
-#    gaus = cv2.GaussianBlur(img, (3,3), cv2.BORDER_DEFAULT)
-#    edges = cv2.Canny(gaus, 100, 200)
-
-#    contours, hier = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-#    contour = max(contours, key = len)
-
-#    #contImg = cv2.drawContours(img, contour, -1, (0,255,0), 3)
-
-#    [intx, inty, intw, inth] = cv2.boundingRect(contour)
-
-
-#    roi = img[inty:inty+inth, intx:intx+intw]
-
-#    return roi
-
-
-#img = cv2.imread("sudoku6.jpeg", 0)
-
 images = []
 path = "../../assets"
 for im in os.listdir("../../assets"):

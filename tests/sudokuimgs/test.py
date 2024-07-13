@@ -93,11 +93,11 @@ def find_board(imagepath):
     # pts1 = ap
     # Try to extract topleft, topright, bottomleft, bottomright
 
-    cv2.imshow("contout", out)
-    cv2.waitKey(0)
+    # cv2.imshow("contout", out)
+    # cv2.waitKey(0)
 
     ap = img.copy()
-    print("APPPROX", ap)
+    # print("APPPROX", ap)
 
     # finds polygon on closed contour
     approx = cv2.approxPolyDP(contour, 0.010 * cv2.arcLength(contour, True), True)
@@ -122,8 +122,8 @@ def find_board(imagepath):
     dst = cv2.warpPerspective(img, M, (intx+intw, inty+inth))
     
     rsdst = cv2.resize(dst, (900, 900))
-    cv2.imshow("WARP", rsdst)
-    cv2.waitKey(0)
+    # cv2.imshow("WARP", rsdst)
+    # cv2.waitKey(0)
 
     return rsdst
 
@@ -158,6 +158,12 @@ class ContoursWithData():
 
     def __init__(self):
         pass
+    
+    def unload(self):
+        self.contours = []
+        self.avg_area = -1
+        self.avg_height = -1
+        self.avg_width = -1
 
     def calc_avg_area(self):
         if len(self.contours) == 0:
@@ -209,72 +215,92 @@ def load_knn():
 
     return kNearest
 
+def get_images():
+    cropped_imgs = []
+    path = "../../assets"
+    for im in os.listdir("../../assets"):
+        if "sudoku" in im:
+            cropped_imgs.append(find_board(os.path.join(path, im)))
+
+    return cropped_imgs
+
+
 def main():
     allContoursWithData = []
     validContoursWithData = []
-
-    imgTestingNumbers = find_board("../../assets/sudoku4.jpeg")
-
-    if imgTestingNumbers is None:
-        print("ERROR")
-        sys.exit(1)
-
-    imgGray, imgThresh, imgThreshCopy = preprocess_img(imgTestingNumbers.copy())
-
-    cv2.imshow("IMTHRES", imgThresh)
-    intKey = cv2.waitKey(0)
-    if intKey == 27: exit(0)
-
-    npaContours, npaHier = cv2.findContours(imgThreshCopy, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
-
-    for npaContour in npaContours:
-        contourWithData = ContourWithData()
-        contourWithData.npaContour = npaContour
-        contourWithData.boundingRect = cv2.boundingRect(contourWithData.npaContour)
-        contourWithData.calculateRectTopLeftPointAndWidthAndHeight()
-        contourWithData.fltArea = cv2.contourArea(contourWithData.npaContour)
-        allContoursWithData.append(contourWithData)
-
-    for contourWithData in allContoursWithData:
-        if contourWithData.checkIfContourValid():
-            validContoursWithData.append(contourWithData)
-
     contours_with_data_calculated = ContoursWithData()
-    contours_with_data_calculated.append_contours(validContoursWithData, imgGray)
 
-    strFinalString = ""
+    images = get_images()
     kNearest = load_knn()
 
-    for contourWithData in contours_with_data_calculated.contours:
-        cv2.rectangle(imgTestingNumbers,                                        # draw rectangle on original testing image
-                      (contourWithData.intRectX, contourWithData.intRectY),     # upper left corner
-                      (contourWithData.intRectX + contourWithData.intRectWidth, contourWithData.intRectY + contourWithData.intRectHeight),      # lower right corner
-                      (0, 0, 0),
-                      2)                        # thickness
+    for imgTestingNumbers in images:
 
+        if imgTestingNumbers is None:
+            print("ERROR")
+            sys.exit(1)
 
-        imgROI = imgThresh[contourWithData.intRectY : contourWithData.intRectY + contourWithData.intRectHeight,     # crop char out of threshold image
-                           contourWithData.intRectX : contourWithData.intRectX + contourWithData.intRectWidth]
+        # cv2.imshow("IMAGE", imgTestingNumbers)
+        # cv2.waitKey(0)
+        # continue
 
-        imgROIResized = cv2.resize(imgROI, (RZW, RZH))
-        npaROIResized = imgROIResized.reshape((1, RZW * RZH))
-        npaROIResized = np.float32(npaROIResized)
+        cpImg = imgTestingNumbers.copy()
+        imgGray, imgThresh, imgThreshCopy = preprocess_img(cpImg)
 
-        retval, npaResults, neigh_resp, dists = kNearest.findNearest(npaROIResized, k=1)
+        # cv2.imshow("IMTHRES", imgThresh)
+        # intKey = cv2.waitKey(0)
+        # if intKey == 27: exit(0)
+
+        npaContours, npaHier = cv2.findContours(imgThreshCopy, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+
+        for npaContour in npaContours:
+            contourWithData = ContourWithData()
+            contourWithData.npaContour = npaContour
+            contourWithData.boundingRect = cv2.boundingRect(contourWithData.npaContour)
+            contourWithData.calculateRectTopLeftPointAndWidthAndHeight()
+            contourWithData.fltArea = cv2.contourArea(contourWithData.npaContour)
+            allContoursWithData.append(contourWithData)
+
+        for contourWithData in allContoursWithData:
+            if contourWithData.checkIfContourValid():
+                validContoursWithData.append(contourWithData)
+
+        contours_with_data_calculated.append_contours(validContoursWithData, imgGray)
+
+        strFinalString = ""
+
+        for contourWithData in contours_with_data_calculated.contours:
+            cv2.rectangle(imgTestingNumbers,                                        # draw rectangle on original testing image
+                          (contourWithData.intRectX, contourWithData.intRectY),     # upper left corner
+                          (contourWithData.intRectX + contourWithData.intRectWidth, contourWithData.intRectY + contourWithData.intRectHeight),      # lower right corner
+                          (0, 0, 0),
+                          2)                        # thickness
+
+            # crop char out of threshold image
+            imgROI = imgThresh[contourWithData.intRectY : contourWithData.intRectY + contourWithData.intRectHeight,
+                               contourWithData.intRectX : contourWithData.intRectX + contourWithData.intRectWidth]
+
+            imgROIResized = cv2.resize(imgROI, (RZW, RZH))
+            npaROIResized = imgROIResized.reshape((1, RZW * RZH))
+            npaROIResized = np.float32(npaROIResized)
+
+            retval, npaResults, neigh_resp, dists = kNearest.findNearest(npaROIResized, k=1)
+            
+            strCurrChar = str(chr(int(npaResults[0][0])))
+            strFinalString = strFinalString + strCurrChar
         
-        strCurrChar = str(chr(int(npaResults[0][0])))
-        strFinalString = strFinalString + strCurrChar
-    
-    print(strFinalString)
+        print(strFinalString)
 
-    # cv2.namedWindow("Out", cv2.WINDOW_KEEPRATIO)
-    resized_img = cv2.resize(imgTestingNumbers, (900,900))
-    cv2.imshow("Out", resized_img)
-    cv2.waitKey(0)
+        resized_img = cv2.resize(imgTestingNumbers, (900,900))
+        cv2.namedWindow("Out", cv2.WINDOW_NORMAL)
+        cv2.imshow("Out", resized_img)
+        intKey = cv2.waitKey(0)
+        if intKey == 27: exit(0)
 
-    cv2.destroyAllWindows()
+        contours_with_data_calculated.unload()
+        allContoursWithData = []
+        validContoursWithData = []
+        cv2.destroyAllWindows()
 
-    return
 
 if __name__ == "__main__":
     main()

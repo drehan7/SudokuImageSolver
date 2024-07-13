@@ -47,7 +47,7 @@ cv::Mat findBoard( const std::string& fp )
 
 int main()
 {
-    std::string dir = "sudoku*.jpeg";
+    std::string dir = "../../assets/sudoku*.jpeg";
     std::vector<cv::String> filenames;
     cv::glob(dir, filenames, false);
 

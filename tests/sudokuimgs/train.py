@@ -2,42 +2,45 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import os, sys
+from test import find_board
 
 def showimg(img, name="IMG"):
     cv2.imshow(name, img)
     cv2.waitKey(0)
 
 
-def find_board(imagepath):
-    img = cv2.imread(imagepath, 0)
-    gaus = cv2.GaussianBlur(img, (3,3), cv2.BORDER_DEFAULT)
-    edges = cv2.Canny(gaus, 100, 200)
+#def find_board(imagepath):
+#    img = cv2.imread(imagepath, 0)
+#    gaus = cv2.GaussianBlur(img, (3,3), cv2.BORDER_DEFAULT)
+#    edges = cv2.Canny(gaus, 100, 200)
 
-    contours, hier = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    contour = max(contours, key = len)
+#    contours, hier = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+#    contour = max(contours, key = len)
 
-    #contImg = cv2.drawContours(img, contour, -1, (0,255,0), 3)
+#    #contImg = cv2.drawContours(img, contour, -1, (0,255,0), 3)
 
-    [intx, inty, intw, inth] = cv2.boundingRect(contour)
+#    [intx, inty, intw, inth] = cv2.boundingRect(contour)
 
 
-    roi = img[inty:inty+inth, intx:intx+intw]
+#    roi = img[inty:inty+inth, intx:intx+intw]
 
-    return roi
+#    return roi
 
 
 #img = cv2.imread("sudoku6.jpeg", 0)
 
 images = []
-for im in os.listdir():
+path = "../../assets"
+for im in os.listdir("../../assets"):
     if "sudoku" in im:
-        images.append(im)
+        images.append(os.path.join(path,im))
 
 
 cropped_imgs = []
 
 for im in images:
     cropped_imgs.append(find_board(im))
+# cropped_imgs.append(find_board("../../assets/sudoku3.jpeg"))
 
 
 MIN_CONTOUR_AREA = 300
@@ -50,9 +53,9 @@ for img in cropped_imgs:
     imgBlurred = cv2.GaussianBlur(img, (5,5), 0)
 
     _, imgThresh = cv2.threshold(imgBlurred, 80, 255, cv2.THRESH_BINARY)
-    #imgThresh = cv2.adaptiveThreshold(imgBlurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 5, 2)
 
     showimg(imgThresh, "imgThresh")
+    showimg(img, "img")
 
     imgThreshCopy = imgThresh.copy()
 

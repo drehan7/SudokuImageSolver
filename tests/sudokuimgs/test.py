@@ -4,24 +4,23 @@ import operator
 import os
 import sys
 
-MIN_CONTOUR_AREA = 500
+MIN_CONTOUR_AREA = 250 
 MAX_CONTOUR_AREA = 7000
 
 RZW, RZH = 20, 30
 
-# Organize points into 
-# topleft, topright, bottomright, bottomleft
+# Organize points
 def order_points(pts):
 
     rect = np.zeros((4,2), dtype="float32")
 
     s = pts.sum(axis=1)
     rect[0] = pts[np.argmin(s)]
-    rect[2] = pts[np.argmax(s)]
+    rect[3] = pts[np.argmax(s)]
 
     diff = np.diff(pts, axis=1)
     rect[1] = pts[np.argmin(diff)]
-    rect[3] = pts[np.argmax(diff)]
+    rect[2] = pts[np.argmax(diff)]
 
     return rect
 
@@ -51,18 +50,21 @@ def four_point_transform(image, pts):
 
     return warped
 
+def preprocess_img(img):
+    imgBlurred = cv2.GaussianBlur(img, (5,5), 0)
+    _, imgThresh = cv2.threshold(imgBlurred, 110, 255, cv2.THRESH_BINARY)
+    imgThreshCopy = imgThresh.copy()
+
+    return img, imgThresh, imgThreshCopy
 
 def find_board(imagepath):
     img = cv2.imread(imagepath, 0)
-    gaus = cv2.GaussianBlur(img, (7,7), cv2.BORDER_DEFAULT)
-
-    cv2.imshow("Original image", img)
-    cv2.waitKey(0)
+    gaus = cv2.GaussianBlur(img, (5,5), cv2.BORDER_DEFAULT)
 
     thresh = cv2.adaptiveThreshold(gaus, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 3)
     thresh = cv2.bitwise_not(thresh)
 
-    contours, hier = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    contours, hier = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     # biggest contour
     maxapprox = None
@@ -76,24 +78,36 @@ def find_board(imagepath):
             
     contour = max(contours, key = cv2.contourArea)
 
+    per = cv2.arcLength(contour, True)
+    ap = cv2.approxPolyDP(contour, 0.05 * per, True)
+
     out = img.copy()
     cv2.drawContours(out, [contour], -1, (0,255,0), 3)
 
+    pts1 = []
+    for point in ap:
+        x, y = point[0]
+        pts1.append([x, y])
+        cv2.circle(out, (x,y), 7, (0,0,0), -1)
+
+    # pts1 = ap
+    # Try to extract topleft, topright, bottomleft, bottomright
+
+    cv2.imshow("contout", out)
+    cv2.waitKey(0)
+
     ap = img.copy()
+    print("APPPROX", ap)
 
     # finds polygon on closed contour
     approx = cv2.approxPolyDP(contour, 0.010 * cv2.arcLength(contour, True), True)
 
     n = approx.ravel()
 
-    [intx, inty, intw, inth] = cv2.boundingRect(contour)
-    pts1 = np.float32([
-        [164, 507],
-        [989, 484],
-        [151, 1392],
-        [1051, 1372]
-        ])
+    pts1 = np.float32(pts1)
+    pts1 = order_points(pts1)
 
+    [intx, inty, intw, inth] = cv2.boundingRect(contour)
     pts2 = np.float32([
         [0,0],
         [intx+intw, 0],
@@ -106,8 +120,12 @@ def find_board(imagepath):
     warp = img.copy()
 
     dst = cv2.warpPerspective(img, M, (intx+intw, inty+inth))
+    
+    rsdst = cv2.resize(dst, (900, 900))
+    cv2.imshow("WARP", rsdst)
+    cv2.waitKey(0)
 
-    return dst
+    return rsdst
 
 
 class ContourWithData():
@@ -138,9 +156,8 @@ class ContoursWithData():
     avg_height = -1
     avg_width = -1
 
-    def __init__(self, _contours):
-        self.contours = _contours
-        self.calc_avg_area()
+    def __init__(self):
+        pass
 
     def calc_avg_area(self):
         if len(self.contours) == 0:
@@ -160,17 +177,18 @@ class ContoursWithData():
         self.avg_height = (height_sum / len(self.contours))
         self.avg_width = (width_sum / len(self.contours))
 
+    def append_contours(self, contours, img):
+        x, y, w, h = cv2.boundingRect(img)
+        for c in contours:
+            if self.within_area(c, (w,h)):
+                self.contours.append(c)
 
-    def within_area(self, contour):
-        pass
+    # Reject contours that are way too close to the edges of image
+    def within_area(self, contour, imgDims):
+        print("IMage rect: ", imgDims)
+        return True
 
-    def set_contours(self, contours_arr):
-        contours = contours_arr
-
-def main():
-    allContoursWithData = []
-    validContoursWithData = []
-
+def load_knn():
     try:
         npaClassifications = np.loadtxt("../../src/models/classifications.txt", np.float32)
         print("Successfully loaded classifications")
@@ -186,26 +204,22 @@ def main():
         sys.exit(1)
 
     npaClassifications = npaClassifications.reshape((npaClassifications.size), 1)
-
     kNearest = cv2.ml.KNearest_create()
-
     kNearest.train(npaFlattenedImages, cv2.ml.ROW_SAMPLE, npaClassifications)
 
-    # kNearest.save("KNN.bin")
+    return kNearest
 
-    imgTestingNumbers = find_board("../../assets/sudoku2.jpeg")
+def main():
+    allContoursWithData = []
+    validContoursWithData = []
+
+    imgTestingNumbers = find_board("../../assets/sudoku4.jpeg")
 
     if imgTestingNumbers is None:
         print("ERROR")
         sys.exit(1)
 
-    imgGray = imgTestingNumbers.copy()
-
-    imgBlurred = cv2.bilateralFilter(imgGray, 10, 100, 75)
-
-    _, imgThresh = cv2.threshold(imgBlurred, 135, 255, cv2.THRESH_BINARY)
-
-    imgThreshCopy = imgThresh.copy()
+    imgGray, imgThresh, imgThreshCopy = preprocess_img(imgTestingNumbers.copy())
 
     cv2.imshow("IMTHRES", imgThresh)
     intKey = cv2.waitKey(0)
@@ -225,9 +239,11 @@ def main():
         if contourWithData.checkIfContourValid():
             validContoursWithData.append(contourWithData)
 
-    contours_with_data_calculated = ContoursWithData(validContoursWithData)
+    contours_with_data_calculated = ContoursWithData()
+    contours_with_data_calculated.append_contours(validContoursWithData, imgGray)
 
     strFinalString = ""
+    kNearest = load_knn()
 
     for contourWithData in contours_with_data_calculated.contours:
         cv2.rectangle(imgTestingNumbers,                                        # draw rectangle on original testing image
@@ -246,18 +262,14 @@ def main():
 
         retval, npaResults, neigh_resp, dists = kNearest.findNearest(npaROIResized, k=1)
         
-        print("NPA RESULTS", npaResults)
-        print("NPA retval", neigh_resp)
-
         strCurrChar = str(chr(int(npaResults[0][0])))
-        print("CURR CHAR: ", strCurrChar)
-        print("RETVAL: ", retval)
-
         strFinalString = strFinalString + strCurrChar
     
     print(strFinalString)
 
-    cv2.imshow("imgtest", imgTestingNumbers)
+    # cv2.namedWindow("Out", cv2.WINDOW_KEEPRATIO)
+    resized_img = cv2.resize(imgTestingNumbers, (900,900))
+    cv2.imshow("Out", resized_img)
     cv2.waitKey(0)
 
     cv2.destroyAllWindows()

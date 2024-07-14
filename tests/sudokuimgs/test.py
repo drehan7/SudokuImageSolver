@@ -24,31 +24,6 @@ def order_points(pts):
 
     return rect
 
-def four_point_transform(image, pts):
-    rect = order_points(pts)
-    (tl, tr, br, bl) = rect
-
-    widthA = np.sqrt(((br[0] - bl[0]) ** 2) + ((br[1] - bl[1]) ** 2))
-    widthB = np.sqrt(((tr[0] - tl[0]) ** 2) + ((tr[1] - tl[1]) ** 2))
-    maxWidth = max(int(widthA), int(widthB))
-
-
-    heightA = np.sqrt(((tr[0] - br[0]) ** 2) + ((tr[1] - br[1]) ** 2))
-    heightB = np.sqrt(((tl[0] - bl[0]) ** 2) + ((tl[1] - bl[1]) ** 2))
-    maxHeight = max(int(heightA), int(heightB))
-
-    dst = np.array([
-        [0,0], # topleft
-        [maxWidth - 1, 0], # topright
-        [maxWidth - 1, maxHeight - 1], # bottomright
-        [0, maxHeight -1]], # bottomleft
-        dtype="float32")
-
-
-    M = cv2.getPerspectiveTransform(rect, dst)
-    warped = cv2.warpPerspective(image, M, (maxWidth, maxHeight))
-
-    return warped
 
 def preprocess_img(img):
     imgBlurred = cv2.GaussianBlur(img, (1,1), cv2.BORDER_DEFAULT)
@@ -57,8 +32,11 @@ def preprocess_img(img):
 
     return img, imgThresh, imgThreshCopy
 
+
 def find_board(imagepath):
     img = cv2.imread(imagepath, 0)
+    cv2.imshow("orig", img)
+    cv2.waitKey(0)
     gaus = cv2.GaussianBlur(img, (5,5), cv2.BORDER_DEFAULT)
 
     thresh = cv2.adaptiveThreshold(gaus, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 3)
@@ -90,14 +68,7 @@ def find_board(imagepath):
         pts1.append([x, y])
         cv2.circle(out, (x,y), 7, (0,0,0), -1)
 
-    # pts1 = ap
-    # Try to extract topleft, topright, bottomleft, bottomright
-
-    # cv2.imshow("contout", out)
-    # cv2.waitKey(0)
-
     ap = img.copy()
-    # print("APPPROX", ap)
 
     # finds polygon on closed contour
     approx = cv2.approxPolyDP(contour, 0.010 * cv2.arcLength(contour, True), True)
@@ -118,12 +89,8 @@ def find_board(imagepath):
     M = cv2.getPerspectiveTransform( pts1, pts2 )
 
     warp = img.copy()
-
     dst = cv2.warpPerspective(img, M, (intx+intw, inty+inth))
-    
     rsdst = cv2.resize(dst, (900, 900))
-    # cv2.imshow("WARP", rsdst)
-    # cv2.waitKey(0)
 
     return rsdst
 
@@ -136,6 +103,8 @@ class ContourWithData():
     intRectY = 0
     intRectWidth = 0
     intRectHeight = 0
+
+    ch_digit = ''
 
     fltArea = 0.0
 
@@ -153,8 +122,10 @@ class ContourWithData():
     def contourGetDims(self):
         return self.intRectX, self.intRectY, self.intRectWidth, self.intRectHeight
 
-class ContoursWithData():
-    contours = []
+
+# Rename this, redundant af
+class DigitContours():
+    contours: ContourWithData = []
     avg_area = -1
     avg_height = -1
     avg_width = -1
@@ -168,38 +139,61 @@ class ContoursWithData():
         self.avg_height = -1
         self.avg_width = -1
 
-    def calc_avg_area(self):
-        if len(self.contours) == 0:
+    def calc_avg_area(self, tmp_contours):
+        if len(tmp_contours) == 0:
             print("contours empty")
             return
 
         area_sum = 0
         height_sum = 0
         width_sum = 0
-        for contour in self.contours:
+        for contour in tmp_contours:
             _area = contour.intRectWidth * contour.intRectHeight
             area_sum += _area
             height_sum += contour.intRectHeight
             width_sum += contour.intRectWidth
         
-        self.avg_area = (area_sum / len(self.contours))
-        self.avg_height = (height_sum / len(self.contours))
-        self.avg_width = (width_sum / len(self.contours))
+        self.avg_area = (area_sum / len(tmp_contours))
+        self.avg_height = (height_sum / len(tmp_contours))
+        self.avg_width = (width_sum / len(tmp_contours))
+        print("Avg height: ", self.avg_height)
+
 
     def append_contours(self, contours, img):
-        x, y, w, h = cv2.boundingRect(img)
+        imgDims = cv2.boundingRect(img)
+        tmp_contours = []
         for c in contours:
-            if self.within_area(c, (w,h)):
-                self.contours.append(c)
+            tmp_contours.append(c)
+
+        self.calc_avg_area(tmp_contours)
+        self.contours = [ c for c in tmp_contours if self.within_area(c, imgDims) ]
+
 
     # Reject contours that are way too close to the edges of image
     def within_area(self, contour, imgDims):
         x, y, w, h = contour.contourGetDims()
-        print("%d, %d, %d, %d" % (x, y, w, h))
         a = w*h
-        # if a < self.avg_area:
-        #     return False
+        if a > self.avg_area * 2: return False
+
+        edge_margin = 20
+        imgX, imgY, imgW, imgH = imgDims
+
+        # Check if contour is on edges of image
+        if x < imgX + edge_margin or y < imgY + edge_margin:
+            return False
+        elif h > self.avg_height + (1/3 * self.avg_height): return False
+
         return True
+
+    # Organize contours from topleft to bottomright
+    # Idea 1:
+        # Draw a horizontal line across image.
+        # Go top to bottom
+        # Once contour is intersected, calculate distance from top, use as stride
+        # Get digit in contour
+    def organize(self):
+        pass
+
 
 def load_knn():
     try:
@@ -222,6 +216,7 @@ def load_knn():
 
     return kNearest
 
+
 def get_images():
     cropped_imgs = []
     path = "../../assets"
@@ -235,7 +230,7 @@ def get_images():
 def main():
     allContoursWithData = []
     validContoursWithData = []
-    contours_with_data_calculated = ContoursWithData()
+    digit_contours = DigitContours()
 
     images = get_images()
     kNearest = load_knn()
@@ -246,16 +241,12 @@ def main():
             print("ERROR")
             sys.exit(1)
 
-        # cv2.imshow("IMAGE", imgTestingNumbers)
-        # cv2.waitKey(0)
-        # continue
-
         cpImg = imgTestingNumbers.copy()
         imgGray, imgThresh, imgThreshCopy = preprocess_img(cpImg)
 
-        # cv2.imshow("IMTHRES", imgThresh)
-        # intKey = cv2.waitKey(0)
-        # if intKey == 27: exit(0)
+        cv2.imshow("IMTHRES", imgThresh)
+        intKey = cv2.waitKey(0)
+        if intKey == 27: exit(0)
 
         npaContours, npaHier = cv2.findContours(imgThreshCopy, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
 
@@ -271,11 +262,14 @@ def main():
             if contourWithData.checkIfContourValid():
                 validContoursWithData.append(contourWithData)
 
-        contours_with_data_calculated.append_contours(validContoursWithData, imgGray)
+        digit_contours.append_contours(validContoursWithData, imgGray)
+
+        # sort contours from topleft to bottomright
+        digit_contours.organize()
 
         strFinalString = ""
 
-        for contourWithData in contours_with_data_calculated.contours:
+        for i, contourWithData in enumerate(digit_contours.contours):
             cv2.rectangle(imgTestingNumbers,                                        # draw rectangle on original testing image
                           (contourWithData.intRectX, contourWithData.intRectY),     # upper left corner
                           (contourWithData.intRectX + contourWithData.intRectWidth, contourWithData.intRectY + contourWithData.intRectHeight),      # lower right corner
@@ -293,17 +287,16 @@ def main():
             retval, npaResults, neigh_resp, dists = kNearest.findNearest(npaROIResized, k=1)
             
             strCurrChar = str(chr(int(npaResults[0][0])))
+            contourWithData.ch_digit = strCurrChar
             strFinalString = strFinalString + strCurrChar
         
-        print(strFinalString)
 
-        resized_img = cv2.resize(imgTestingNumbers, (900,900))
-        cv2.namedWindow("Out", cv2.WINDOW_NORMAL)
-        cv2.imshow("Out", resized_img)
-        intKey = cv2.waitKey(0)
-        if intKey == 27: exit(0)
+        # cv2.namedWindow("Out", cv2.WINDOW_NORMAL)
+        # cv2.imshow("Out", imgTestingNumbers)
+        # intKey = cv2.waitKey(0)
+        # if intKey == 27: exit(0)
 
-        contours_with_data_calculated.unload()
+        digit_contours.unload()
         allContoursWithData = []
         validContoursWithData = []
         cv2.destroyAllWindows()

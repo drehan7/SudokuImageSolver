@@ -4,8 +4,8 @@ import operator
 import os
 import sys
 
-MIN_CONTOUR_AREA = 250 
-MAX_CONTOUR_AREA = 7000
+MIN_CONTOUR_AREA = 265 
+MAX_CONTOUR_AREA = 7500
 
 RZW, RZH = 20, 30
 
@@ -51,8 +51,8 @@ def four_point_transform(image, pts):
     return warped
 
 def preprocess_img(img):
-    imgBlurred = cv2.GaussianBlur(img, (5,5), 0)
-    _, imgThresh = cv2.threshold(imgBlurred, 110, 255, cv2.THRESH_BINARY)
+    imgBlurred = cv2.GaussianBlur(img, (1,1), cv2.BORDER_DEFAULT)
+    _, imgThresh = cv2.threshold(imgBlurred, 115, 255, cv2.THRESH_TOZERO)
     imgThreshCopy = imgThresh.copy()
 
     return img, imgThresh, imgThreshCopy
@@ -150,6 +150,9 @@ class ContourWithData():
         if self.fltArea < MIN_CONTOUR_AREA or self.fltArea > MAX_CONTOUR_AREA: return False
         return True
 
+    def contourGetDims(self):
+        return self.intRectX, self.intRectY, self.intRectWidth, self.intRectHeight
+
 class ContoursWithData():
     contours = []
     avg_area = -1
@@ -191,7 +194,11 @@ class ContoursWithData():
 
     # Reject contours that are way too close to the edges of image
     def within_area(self, contour, imgDims):
-        print("IMage rect: ", imgDims)
+        x, y, w, h = contour.contourGetDims()
+        print("%d, %d, %d, %d" % (x, y, w, h))
+        a = w*h
+        # if a < self.avg_area:
+        #     return False
         return True
 
 def load_knn():

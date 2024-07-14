@@ -35,8 +35,6 @@ def preprocess_img(img):
 
 def find_board(imagepath):
     img = cv2.imread(imagepath, 0)
-    cv2.imshow("orig", img)
-    cv2.waitKey(0)
     gaus = cv2.GaussianBlur(img, (5,5), cv2.BORDER_DEFAULT)
 
     thresh = cv2.adaptiveThreshold(gaus, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 3)
@@ -244,9 +242,9 @@ def main():
         cpImg = imgTestingNumbers.copy()
         imgGray, imgThresh, imgThreshCopy = preprocess_img(cpImg)
 
-        cv2.imshow("IMTHRES", imgThresh)
-        intKey = cv2.waitKey(0)
-        if intKey == 27: exit(0)
+        # cv2.imshow("IMTHRES", imgThresh)
+        # intKey = cv2.waitKey(0)
+        # if intKey == 27: exit(0)
 
         npaContours, npaHier = cv2.findContours(imgThreshCopy, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
 
@@ -291,10 +289,10 @@ def main():
             strFinalString = strFinalString + strCurrChar
         
 
-        # cv2.namedWindow("Out", cv2.WINDOW_NORMAL)
-        # cv2.imshow("Out", imgTestingNumbers)
-        # intKey = cv2.waitKey(0)
-        # if intKey == 27: exit(0)
+        cv2.namedWindow("Out", cv2.WINDOW_NORMAL)
+        cv2.imshow("Out", imgTestingNumbers)
+        intKey = cv2.waitKey(0)
+        if intKey == 27: exit(0)
 
         digit_contours.unload()
         allContoursWithData = []
